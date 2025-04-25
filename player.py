@@ -2,7 +2,7 @@
 import pygame
 from constants import *
 from circleshape import CircleShape
-
+from shot import Shot
 
 class Player(CircleShape):
 	def __init__(self, x, y):
@@ -32,6 +32,13 @@ class Player(CircleShape):
 		forward = pygame.Vector2(0, 1).rotate(self.rotation)
 		self.position += forward * PLAYER_SPEED * dt
 
+	#player shooting
+	def shoot(self, shots_group):
+		new_shot = Shot(self.position.x, self.position.y)
+		shot_direction = pygame.Vector2(0,-1)
+		shot_direction = shot_direction.rotate(self.rotation)
+		new_shot.velocity = shot_direction * PLAYER_SHOOT_SPEED
+		shots_group.add(new_shot)
 
 	# player update location 
 	def update(self, dt):
@@ -45,3 +52,5 @@ class Player(CircleShape):
 			self.move(dt)
 		if keys[pygame.K_s]:
 			self.move(-dt)
+		if keys[pygame.K_SPACE] and hasattr(self, "shots_group"):
+			self.shoot(self.shots_group)
