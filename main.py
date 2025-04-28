@@ -7,6 +7,8 @@ from constants import *
 from asteroid import Asteroid
 from asteroidfield import AsteroidField
 from shot import Shot
+from floatingtext import FloatingText
+
 
 print("Starting Asteroids!")
 print(f"Screen width: {SCREEN_WIDTH}")
@@ -23,12 +25,20 @@ def main():
 	clock = pygame.time.Clock() 
 	dt = 0
 
+	#Scoring system
+	score = 0
+	font = pygame.font.Font(None, 36)
+	BASE_SCORE = 50
+
 	#groups setup
 	updatable = pygame.sprite.Group()
 	drawable = pygame.sprite.Group()
 	asteroids = pygame.sprite.Group()
 	shots_group = pygame.sprite.Group()
+	floating_texts = pygame.sprite.Group()
 
+
+	#Group containers
 	Player.containers = (updatable, drawable)
 	Asteroid.containers = (asteroids, updatable, drawable)
 	AsteroidField.containers = (updatable,)
@@ -50,6 +60,7 @@ def main():
 
 		dt = clock.tick(60) / 1000
 		updatable.update(dt)
+		floating_texts.update(dt)
 		screen.fill("black")
 
 		for asteroid in asteroids:
@@ -65,11 +76,26 @@ def main():
 					asteroid.split()
 					shot.kill()
 
+					multiplier = asteroid.radius / ASTEROID_MIN_RADIUS
+					points = int(BASE_SCORE * multiplier)
+					score += points
+
+					text = FloatingText(f"+{points}", asteroid.position)
+					floating_texts.add(text)
+
 
 		#drawing objects
 		for drawable_object in drawable:
 			drawable_object.draw(screen)
 
+
+		# Draw score
+		score_text = font.render(f"Score: {score}", True, (255, 255, 255))
+		screen.blit(score_text, (10, 10))
+
+		#floating text from kill
+		for text in floating_texts:
+			screen.blit(text.image, text.rect)
 
 		pygame.display.flip()
 
