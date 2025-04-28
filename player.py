@@ -36,12 +36,21 @@ class Player(CircleShape):
 	def shoot(self, shots_group):
 		if self.shoot_timer > 0:
 			return
-		new_shot = Shot(self.position.x, self.position.y)
-		shot_direction = pygame.Vector2(0,-1)
-		shot_direction = shot_direction.rotate(self.rotation)
-		new_shot.velocity = shot_direction * PLAYER_SHOOT_SPEED
+
+		# Get the forward direction based on player's rotation (same as in triangle method)
+		forward = pygame.Vector2(0, 1).rotate(self.rotation)
+
+		# Create the shot at the front of the ship
+		shot_pos = self.position + forward * self.radius  # Start at the tip of the triangle
+		new_shot = Shot(shot_pos.x, shot_pos.y)
+
+		# Set velocity in forward direction
+		new_shot.velocity = forward * PLAYER_SHOOT_SPEED
+
 		shots_group.add(new_shot)
 		self.shoot_timer = PLAYER_SHOOT_COOLDOWN
+
+
 
 	# player update location 
 	def update(self, dt):
