@@ -62,7 +62,7 @@ def main():
 		for asteroid in asteroids:
 			for shot in shots_group:
 				if shot.collides_with(asteroid) or asteroid.collides_with(shot):
-					asteroid.kill()
+					asteroid.split()
 					shot.kill()
 
 
