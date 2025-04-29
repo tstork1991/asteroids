@@ -15,14 +15,29 @@ print(f"Screen width: {SCREEN_WIDTH}")
 print(f"Screen height: {SCREEN_HEIGHT}")
 
 def main():
+    pygame.mixer.pre_init(44100, -16, 2, 512)
     pygame.init()
+
+    # Load sound effects
+    shoot_sound = pygame.mixer.Sound("sounds/shoot.wav")
+    shoot_sound.set_volume(0.4)
+
+    explosion_sound = pygame.mixer.Sound("sounds/explosion.wav")
+    explosion_sound.set_volume(0.1)
+
+    game_over_sound = pygame.mixer.Sound("sounds/game over.wav")
+    game_over_sound.set_volume(0.7)
+
+    # Load and play background music
+    pygame.mixer.music.load("sounds/music.ogg")
+    pygame.mixer.music.set_volume(0.5)
+    pygame.mixer.music.play(-1)
 
     # Setup screen and clock
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     clock = pygame.time.Clock()
     dt = 0
 
-    # Scoring system
     BASE_SCORE = 50
     font = pygame.font.Font(None, 36)
 
@@ -38,12 +53,12 @@ def main():
                 highscore_name = data[0]
                 highscore_value = int(data[1])
             except:
-                pass  # File corrupted or empty
+                pass
 
     entering_initials = False
     player_initials = ""
 
-    # These must exist for nonlocal reset_game
+    # Game state
     updatable = None
     drawable = None
     asteroids = None
@@ -53,11 +68,11 @@ def main():
     asteroid_field = None
     score = 0
     game_over = False
+    music_stopped = False  # 🆕 Track if music already stopped
 
-    # Reset Game
     def reset_game():
         nonlocal updatable, drawable, asteroids, shots_group, floating_texts
-        nonlocal player, asteroid_field, score, game_over
+        nonlocal player, asteroid_field, score, game_over, music_stopped
         nonlocal entering_initials, player_initials
 
         updatable = pygame.sprite.Group()
@@ -73,24 +88,22 @@ def main():
 
         player = Player(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)
         player.shots_group = shots_group
+        player.shoot_sound = shoot_sound  # 🔫 inject shoot sound
 
         asteroid_field = AsteroidField()
 
         score = 0
         game_over = False
+        music_stopped = False
         entering_initials = False
         player_initials = ""
 
     reset_game()
 
-    # --- GAME LOOP ---
     while True:
         dt = clock.tick(60) / 1000
-
-        # Fill screen first
         screen.fill("black")
 
-        # Event Handling
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return
@@ -113,25 +126,27 @@ def main():
                         else:
                             return
 
-        # Update
         if not game_over:
             updatable.update(dt)
             floating_texts.update(dt)
 
-            # Check player collision with asteroid
             for asteroid in asteroids:
                 if player.collides_with(asteroid):
                     print("Game over!")
                     game_over = True
+                    if not music_stopped:
+                        pygame.mixer.music.stop()  # 🛑 Stop background music
+                        game_over_sound.play()     # 🔔 Play Game Over sound
+                        music_stopped = True
                     if score > highscore_value:
                         entering_initials = True
 
-            # Shot hitting asteroids
             for asteroid in asteroids:
                 for shot in shots_group:
                     if shot.collides_with(asteroid) or asteroid.collides_with(shot):
                         asteroid.split()
                         shot.kill()
+                        explosion_sound.play()
 
                         multiplier = asteroid.radius / ASTEROID_MIN_RADIUS
                         points = int(BASE_SCORE * multiplier)
@@ -140,11 +155,8 @@ def main():
                         text = FloatingText(f"+{points}", asteroid.position)
                         floating_texts.add(text)
         else:
-            # Always update floating texts to let them fade out
             floating_texts.update(dt)
 
-        # --- DRAWING ---
-        # Draw objects
         for drawable_object in drawable:
             drawable_object.draw(screen)
 
@@ -154,7 +166,6 @@ def main():
         for text in floating_texts:
             screen.blit(text.image, text.rect)
 
-        # Draw score
         score_text = font.render(f"Score: {score}", True, (255, 255, 255))
         screen.blit(score_text, (10, 10))
 
@@ -175,7 +186,6 @@ def main():
                 restart_rect = restart_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 30))
                 screen.blit(restart_text, restart_rect)
 
-            # Show current high score
             hs_font = pygame.font.Font(None, 36)
             hs_text = hs_font.render(f"High Score: {highscore_name} {highscore_value}", True, (255, 255, 255))
             hs_rect = hs_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 80))
@@ -185,4 +195,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
