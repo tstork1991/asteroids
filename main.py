@@ -9,6 +9,7 @@ from asteroid import Asteroid
 from asteroidfield import AsteroidField
 from shot import Shot
 from floatingtext import FloatingText
+from parallax import ParallaxStarField
 
 print("Starting Asteroids!")
 print(f"Screen width: {SCREEN_WIDTH}")
@@ -26,7 +27,6 @@ def main():
     pygame.mixer.music.load("sounds/music.ogg")
     pygame.mixer.music.play(-1)
 
-    # Volume state
     music_volume = 0.5
     sfx_volume = 0.5
     muted = False
@@ -47,7 +47,6 @@ def main():
 
     apply_volume()
 
-    # Pause system
     paused = False
     showing_instructions = False
     pause_font = pygame.font.Font(None, 48)
@@ -88,6 +87,8 @@ def main():
     game_over = False
     music_stopped = False
 
+    starfield = ParallaxStarField(SCREEN_WIDTH, SCREEN_HEIGHT, [10, 30, 60])
+
     def reset_game():
         nonlocal updatable, drawable, asteroids, shots_group, floating_texts
         nonlocal player, asteroid_field, score, game_over, music_stopped
@@ -122,6 +123,9 @@ def main():
         dt = clock.tick(60) / 1000
         screen.fill("black")
 
+        if not paused and not game_over:
+            starfield.update(dt)
+
         if volume_display_timer > 0:
             volume_display_timer -= dt
 
@@ -130,11 +134,28 @@ def main():
                 return
 
             if event.type == pygame.KEYDOWN:
-                if showing_instructions:
+                if game_over:
+                    if entering_initials:
+                        if event.key == pygame.K_BACKSPACE and len(player_initials) > 0:
+                            player_initials = player_initials[:-1]
+                        elif event.key == pygame.K_RETURN and len(player_initials) == 3:
+                            with open(highscore_file, "w") as f:
+                                f.write(f"{player_initials.upper()} {score}")
+                            entering_initials = False
+                        elif len(player_initials) < 3 and event.unicode.isalpha():
+                            player_initials += event.unicode.upper()
+                    else:
+                        if event.key == pygame.K_r:
+                            reset_game()
+                        elif event.key == pygame.K_ESCAPE:
+                            pygame.quit()
+                            sys.exit()
+
+                elif showing_instructions:
                     if event.key == pygame.K_ESCAPE:
                         showing_instructions = False
 
-                elif paused and not game_over:
+                elif paused:
                     if event.key == pygame.K_w or event.key == pygame.K_UP:
                         selected_option = (selected_option - 1) % len(pause_options)
                     if event.key == pygame.K_s or event.key == pygame.K_DOWN:
@@ -167,38 +188,6 @@ def main():
                     if event.key == pygame.K_p:
                         paused = not paused
 
-                    if not paused and not game_over:
-                        if event.key == pygame.K_EQUALS or event.key == pygame.K_PLUS:
-                            sfx_volume = min(sfx_volume + 0.1, 1.0)
-                            apply_volume()
-                            volume_display_timer = 3
-                        if event.key == pygame.K_MINUS:
-                            sfx_volume = max(sfx_volume - 0.1, 0.0)
-                            apply_volume()
-                            volume_display_timer = 3
-                        if event.key == pygame.K_m:
-                            muted = not muted
-                            apply_volume()
-                            volume_display_timer = 3
-
-            if game_over:
-                if entering_initials:
-                    if event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_BACKSPACE and len(player_initials) > 0:
-                            player_initials = player_initials[:-1]
-                        elif event.key == pygame.K_RETURN and len(player_initials) == 3:
-                            with open(highscore_file, "w") as f:
-                                f.write(f"{player_initials.upper()} {score}")
-                            entering_initials = False
-                        elif len(player_initials) < 3 and event.unicode.isalpha():
-                            player_initials += event.unicode.upper()
-                else:
-                    if event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_r:
-                            reset_game()
-                        else:
-                            return
-
         if not paused and not game_over:
             updatable.update(dt)
             floating_texts.update(dt)
@@ -229,6 +218,8 @@ def main():
         else:
             floating_texts.update(dt)
 
+        starfield.draw(screen)
+
         for drawable_object in drawable:
             drawable_object.draw(screen)
 
@@ -241,74 +232,55 @@ def main():
         score_text = font.render(f"Score: {score}", True, (255, 255, 255))
         screen.blit(score_text, (10, 10))
 
-        if volume_display_timer > 0:
-            vol_text = "Muted" if muted else f"SFX Volume: {int(sfx_volume * 100)}%"
-            vol_render = volume_display_font.render(vol_text, True, (255, 255, 0))
-            vol_rect = vol_render.get_rect(center=(SCREEN_WIDTH / 2, 30))
-            screen.blit(vol_render, vol_rect)
+        if paused and showing_instructions:
+            title = pause_font.render("INSTRUCTIONS", True, (255, 255, 0))
+            screen.blit(title, title.get_rect(center=(SCREEN_WIDTH/2, 80)))
 
-        if paused and not game_over:
-            if showing_instructions:
-                # Draw Instructions
-                title = pause_font.render("INSTRUCTIONS", True, (255, 255, 0))
-                title_rect = title.get_rect(center=(SCREEN_WIDTH/2, 80))
-                screen.blit(title, title_rect)
+            instructions = [
+                "Move: W / A / S / D",
+                "Rotate: A / D",
+                "Shoot: SPACE",
+                "Pause: P",
+                "Increase Volume: +",
+                "Decrease Volume: -",
+                "Mute: M",
+                "",
+                "Press ESC to return"
+            ]
+            for i, line in enumerate(instructions):
+                txt = font.render(line, True, (255, 255, 255))
+                screen.blit(txt, txt.get_rect(center=(SCREEN_WIDTH/2, 150 + i * 40)))
 
-                instructions = [
-                    "Move: W / A / S / D",
-                    "Rotate: A / D",
-                    "Shoot: SPACE",
-                    "Pause: P",
-                    "Increase Volume: +",
-                    "Decrease Volume: -",
-                    "Mute: M",
-                    "",
-                    "Press ESC to return"
-                ]
+        elif paused and not game_over:
+            title = pause_font.render("PAUSED", True, (255, 255, 0))
+            screen.blit(title, title.get_rect(center=(SCREEN_WIDTH/2, 100)))
 
-                for i, line in enumerate(instructions):
-                    line_text = font.render(line, True, (255, 255, 255))
-                    line_rect = line_text.get_rect(center=(SCREEN_WIDTH/2, 150 + i * 40))
-                    screen.blit(line_text, line_rect)
-
-            else:
-                # Draw normal Pause Menu
-                title = pause_font.render("PAUSED", True, (255, 255, 0))
-                title_rect = title.get_rect(center=(SCREEN_WIDTH/2, 100))
-                screen.blit(title, title_rect)
-
-                for idx, option in enumerate(pause_options):
-                    if option == "Music Volume":
-                        text = f"Music Volume: {int(music_volume * 100)}%"
-                    elif option == "SFX Volume":
-                        text = f"SFX Volume: {int(sfx_volume * 100)}%"
-                    else:
-                        text = option
-
-                    color = (255, 255, 0) if idx == selected_option else (255, 255, 255)
-                    option_text = font.render(text, True, color)
-                    option_rect = option_text.get_rect(center=(SCREEN_WIDTH/2, 200 + idx * 40))
-                    screen.blit(option_text, option_rect)
+            for idx, option in enumerate(pause_options):
+                if option == "Music Volume":
+                    text = f"Music Volume: {int(music_volume * 100)}%"
+                elif option == "SFX Volume":
+                    text = f"SFX Volume: {int(sfx_volume * 100)}%"
+                else:
+                    text = option
+                color = (255, 255, 0) if idx == selected_option else (255, 255, 255)
+                txt = font.render(text, True, color)
+                screen.blit(txt, txt.get_rect(center=(SCREEN_WIDTH/2, 200 + idx * 40)))
 
         if game_over:
             game_over_font = pygame.font.Font(None, 72)
             game_over_text = game_over_font.render("GAME OVER!", True, (255, 0, 0))
-            game_over_rect = game_over_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 50))
-            screen.blit(game_over_text, game_over_rect)
+            screen.blit(game_over_text, game_over_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 - 50)))
 
             if entering_initials:
                 initials_font = pygame.font.Font(None, 48)
                 initials_text = initials_font.render(f"Enter Initials: {player_initials}", True, (255, 255, 255))
-                initials_rect = initials_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 10))
-                screen.blit(initials_text, initials_rect)
+                screen.blit(initials_text, initials_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 10)))
             else:
-                restart_font = font.render("Press R to Restart", True, (255, 255, 255))
-                restart_rect = restart_font.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 30))
-                screen.blit(restart_text, restart_rect)
+                restart_font = font.render("Press R to Restart or ESC to Quit", True, (255, 255, 255))
+                screen.blit(restart_font, restart_font.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 30)))
 
             hs_font = font.render(f"High Score: {highscore_name} {highscore_value}", True, (255, 255, 255))
-            hs_rect = hs_text.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 80))
-            screen.blit(hs_text, hs_rect)
+            screen.blit(hs_font, hs_font.get_rect(center=(SCREEN_WIDTH/2, SCREEN_HEIGHT/2 + 80)))
 
         pygame.display.flip()
 
