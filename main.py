@@ -20,20 +20,31 @@ def main():
 
     # Load sound effects
     shoot_sound = pygame.mixer.Sound("sounds/shoot.wav")
-    shoot_sound.set_volume(0.4)
-
     explosion_sound = pygame.mixer.Sound("sounds/explosion.wav")
-    explosion_sound.set_volume(0.1)
-
     game_over_sound = pygame.mixer.Sound("sounds/game over.wav")
-    game_over_sound.set_volume(0.7)
 
-    # Load and play background music
     pygame.mixer.music.load("sounds/music.ogg")
-    pygame.mixer.music.set_volume(0.5)
     pygame.mixer.music.play(-1)
 
-    # Setup screen and clock
+    # Volume state
+    master_volume = 0.5
+    muted = False
+    volume_display_timer = 0
+    volume_display_font = pygame.font.Font(None, 30)
+
+    def apply_volume():
+        if muted:
+            shoot_sound.set_volume(0)
+            explosion_sound.set_volume(0)
+            pygame.mixer.music.set_volume(0)
+        else:
+            shoot_sound.set_volume(master_volume * 0.8)
+            explosion_sound.set_volume(master_volume * 0.1)
+            pygame.mixer.music.set_volume(master_volume * 0.5)
+            game_over_sound.set_volume(master_volume * 0.7)
+
+    apply_volume()
+
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     clock = pygame.time.Clock()
     dt = 0
@@ -41,7 +52,6 @@ def main():
     BASE_SCORE = 50
     font = pygame.font.Font(None, 36)
 
-    # High score setup
     highscore_file = "highscore.txt"
     highscore_name = "AAA"
     highscore_value = 0
@@ -58,7 +68,6 @@ def main():
     entering_initials = False
     player_initials = ""
 
-    # Game state
     updatable = None
     drawable = None
     asteroids = None
@@ -68,7 +77,7 @@ def main():
     asteroid_field = None
     score = 0
     game_over = False
-    music_stopped = False  # 🆕 Track if music already stopped
+    music_stopped = False
 
     def reset_game():
         nonlocal updatable, drawable, asteroids, shots_group, floating_texts
@@ -88,7 +97,7 @@ def main():
 
         player = Player(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)
         player.shots_group = shots_group
-        player.shoot_sound = shoot_sound  # 🔫 inject shoot sound
+        player.shoot_sound = shoot_sound
 
         asteroid_field = AsteroidField()
 
@@ -104,9 +113,29 @@ def main():
         dt = clock.tick(60) / 1000
         screen.fill("black")
 
+        if volume_display_timer > 0:
+            volume_display_timer -= dt
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_EQUALS or event.key == pygame.K_PLUS:
+                    master_volume = min(master_volume + 0.1, 1.0)
+                    apply_volume()
+                    volume_display_timer = 3
+                    print(f"🔊 Volume increased to {int(master_volume * 100)}%")
+                if event.key == pygame.K_MINUS:
+                    master_volume = max(master_volume - 0.1, 0.0)
+                    apply_volume()
+                    volume_display_timer = 3
+                    print(f"�� Volume decreased to {int(master_volume * 100)}%")
+                if event.key == pygame.K_m:
+                    muted = not muted
+                    apply_volume()
+                    volume_display_timer = 3
+                    print(f"🔇 Muted" if muted else f"🔈 Unmuted")
 
             if game_over:
                 if entering_initials:
@@ -135,8 +164,8 @@ def main():
                     print("Game over!")
                     game_over = True
                     if not music_stopped:
-                        pygame.mixer.music.stop()  # 🛑 Stop background music
-                        game_over_sound.play()     # 🔔 Play Game Over sound
+                        pygame.mixer.music.stop()
+                        game_over_sound.play()
                         music_stopped = True
                     if score > highscore_value:
                         entering_initials = True
@@ -168,6 +197,12 @@ def main():
 
         score_text = font.render(f"Score: {score}", True, (255, 255, 255))
         screen.blit(score_text, (10, 10))
+
+        if volume_display_timer > 0:
+            vol_text = "Muted" if muted else f"Volume: {int(master_volume * 100)}%"
+            vol_render = volume_display_font.render(vol_text, True, (255, 255, 0))
+            vol_rect = vol_render.get_rect(center=(SCREEN_WIDTH / 2, 30))
+            screen.blit(vol_render, vol_rect)
 
         if game_over:
             game_over_font = pygame.font.Font(None, 72)
